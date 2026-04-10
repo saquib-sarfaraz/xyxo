@@ -1,0 +1,57 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="128"
+  height="128"
+  viewBox="0 0 128 128"
+  fill="none"
+>
+  <defs>
+    <linearGradient id="ember4_g" x1="16" y1="20" x2="112" y2="112">
+      <stop stop-color="#FB7185" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#F97316" stop-opacity="0.75" />
+    </linearGradient>
+    <filter
+      id="ember4_glow"
+      x="-50%"
+      y="-50%"
+      width="200%"
+      height="200%"
+      color-interpolation-filters="sRGB"
+    >
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect
+    x="10"
+    y="10"
+    width="108"
+    height="108"
+    rx="30"
+    fill="#FFFFFF"
+    fill-opacity="0.04"
+    stroke="#FFFFFF"
+    stroke-opacity="0.14"
+  />
+
+  <g filter="url(#ember4_glow)">
+    <circle cx="64" cy="48" r="18" fill="url(#ember4_g)" />
+    <path
+      d="M30 108c3-19 17-34 34-34h0c17 0 31 15 34 34"
+      fill="url(#ember4_g)"
+      fill-opacity="0.9"
+    />
+    <path
+      d="M42 46h44"
+      stroke="#FFFFFF"
+      stroke-opacity="0.14"
+      stroke-width="3"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>
+

@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-app-bg text-zinc-100 font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-glass;
+  }
+
+  .glass-button {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-100 shadow-glass transition;
+  }
+  .glass-button:hover {
+    @apply border-white/20 bg-white/10;
+  }
+  .glass-button:focus-visible {
+    @apply outline-none ring-2 ring-neon-cyan/60 ring-offset-2 ring-offset-app-bg;
+  }
+
+  .nav-active {
+    @apply border-neon-cyan/40 bg-white/10 shadow-neon-cyan;
+  }
+
+  .neon-divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
+  }
+
+  .tile {
+    @apply relative flex aspect-square w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-4xl font-bold text-zinc-100 shadow-glass transition;
+  }
+  .tile:hover {
+    @apply border-white/20 bg-white/10 shadow-neon-purple;
+  }
+}
+
+@layer utilities {
+  .text-glow-cyan {
+    text-shadow:
+      0 0 14px rgba(34, 211, 238, 0.35),
+      0 0 34px rgba(34, 211, 238, 0.2);
+  }
+  .text-glow-purple {
+    text-shadow:
+      0 0 14px rgba(168, 85, 247, 0.35),
+      0 0 34px rgba(168, 85, 247, 0.2);
+  }
+
+  .neon-bar {
+    background: linear-gradient(90deg, #00f0ff, #00d4ff, #00f0ff);
+    background-size: 200% 100%;
+    box-shadow:
+      0 0 8px rgba(0, 240, 255, 0.6),
+      0 0 16px rgba(0, 240, 255, 0.45),
+      0 0 24px rgba(0, 240, 255, 0.25);
+    animation: liquidFlow 2s linear infinite;
+  }
+
+  .danger-bar {
+    background: linear-gradient(90deg, #ff3b3b, #ff0000);
+    background-size: 200% 100%;
+    box-shadow:
+      0 0 8px rgba(255, 0, 0, 0.6),
+      0 0 16px rgba(255, 0, 0, 0.45);
+    animation: liquidFlow 1.6s linear infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spinSlow 3s linear infinite;
+  }
+
+  .fireworks-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .firework-particle {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--size);
+    height: var(--size);
+    border-radius: 9999px;
+    background: hsl(var(--hue) 100% 60%);
+    box-shadow:
+      0 0 10px hsla(var(--hue) 100% 65% / 0.7),
+      0 0 22px hsla(var(--hue) 100% 65% / 0.35);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+    animation: fireworkExplode 3s ease-out forwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes spinSlow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes liquidFlow {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 200% 50%;
+    }
+  }
+
+  @keyframes fireworkExplode {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.6);
+    }
+    12% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(2.2);
+    }
+  }
+}

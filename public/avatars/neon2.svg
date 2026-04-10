@@ -1,0 +1,57 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="128"
+  height="128"
+  viewBox="0 0 128 128"
+  fill="none"
+>
+  <defs>
+    <linearGradient id="neon2_g" x1="20" y1="16" x2="112" y2="112">
+      <stop stop-color="#A855F7" stop-opacity="0.92" />
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0.78" />
+    </linearGradient>
+    <filter
+      id="neon2_glow"
+      x="-50%"
+      y="-50%"
+      width="200%"
+      height="200%"
+      color-interpolation-filters="sRGB"
+    >
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect
+    x="10"
+    y="10"
+    width="108"
+    height="108"
+    rx="30"
+    fill="#FFFFFF"
+    fill-opacity="0.04"
+    stroke="#FFFFFF"
+    stroke-opacity="0.14"
+  />
+
+  <g filter="url(#neon2_glow)">
+    <circle cx="64" cy="48" r="18" fill="url(#neon2_g)" />
+    <path
+      d="M30 108c2-18.5 16-33.5 34-33.5h0c18 0 32 15 34 33.5"
+      fill="url(#neon2_g)"
+      fill-opacity="0.9"
+    />
+    <path
+      d="M54 41c4-3 8-4.5 10-4.5 2 0 6 1.5 10 4.5"
+      stroke="#FFFFFF"
+      stroke-opacity="0.2"
+      stroke-width="3"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>
+

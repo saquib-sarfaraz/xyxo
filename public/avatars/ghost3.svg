@@ -1,0 +1,57 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="128"
+  height="128"
+  viewBox="0 0 128 128"
+  fill="none"
+>
+  <defs>
+    <linearGradient id="ghost3_g" x1="18" y1="18" x2="112" y2="110">
+      <stop stop-color="#67E8F9" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0.75" />
+    </linearGradient>
+    <filter
+      id="ghost3_glow"
+      x="-50%"
+      y="-50%"
+      width="200%"
+      height="200%"
+      color-interpolation-filters="sRGB"
+    >
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect
+    x="10"
+    y="10"
+    width="108"
+    height="108"
+    rx="30"
+    fill="#FFFFFF"
+    fill-opacity="0.04"
+    stroke="#FFFFFF"
+    stroke-opacity="0.14"
+  />
+
+  <g filter="url(#ghost3_glow)">
+    <circle cx="64" cy="50" r="18" fill="url(#ghost3_g)" />
+    <path
+      d="M34 108c0-18 13.5-32.5 30-32.5S94 90 94 108"
+      fill="url(#ghost3_g)"
+      fill-opacity="0.9"
+    />
+    <path
+      d="M50 54c4 3 8 4.5 14 4.5s10-1.5 14-4.5"
+      stroke="#FFFFFF"
+      stroke-opacity="0.18"
+      stroke-width="3"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>
+
