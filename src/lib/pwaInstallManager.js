@@ -1,4 +1,5 @@
 let deferredPrompt = null
+let canInstall = false
 
 export function initPWAInstall(setCanInstall) {
   if (isAppInstalled()) return
@@ -6,10 +7,18 @@ export function initPWAInstall(setCanInstall) {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()
     deferredPrompt = e
+    canInstall = true
+    setCanInstall(true)
+  })
 
-    setTimeout(() => {
-      setCanInstall(true)
-    }, 5000)
+  window.addEventListener('appinstalled', () => {
+    try {
+      localStorage.setItem('appInstalled', 'true')
+    } catch {
+      // ignore
+    }
+    deferredPrompt = null
+    canInstall = false
   })
 }
 
@@ -18,10 +27,16 @@ export async function triggerInstall() {
 
   const choice = await deferredPrompt.userChoice
   deferredPrompt = null
+  canInstall = false
   return choice
 }
 
 export function isAppInstalled() {
+  try {
+    if (localStorage.getItem('appInstalled') === 'true') return true
+  } catch {
+    // ignore
+  }
   return (
     window.matchMedia?.('(display-mode: standalone)').matches ||
     window.navigator?.standalone === true
@@ -30,7 +45,7 @@ export function isAppInstalled() {
 
 export function getInstallDismissed() {
   try {
-    return sessionStorage.getItem('installDismissed') === 'true'
+    return localStorage.getItem('installDismissed') === 'true'
   } catch {
     return false
   }
@@ -38,8 +53,14 @@ export function getInstallDismissed() {
 
 export function setInstallDismissed() {
   try {
-    sessionStorage.setItem('installDismissed', 'true')
+    localStorage.setItem('installDismissed', 'true')
   } catch {
     // ignore
   }
+}
+
+export function enableInstallBanner() {
+  if (!deferredPrompt || canInstall) return false
+  canInstall = true
+  return true
 }
