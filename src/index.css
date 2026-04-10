@@ -10,6 +10,19 @@
   html,
   body {
     height: 100%;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tile {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  .transform-gpu {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
 
   body {

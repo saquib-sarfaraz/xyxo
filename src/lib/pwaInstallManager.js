@@ -1,51 +1,58 @@
 let deferredPrompt = null
-let canInstall = false
 
 export function initPWAInstall(setCanInstall) {
-  if (isAppInstalled()) return
+  if (isAppInstalled()) {
+    console.log('[PWA] Already installed')
+    return
+  }
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()
     deferredPrompt = e
-    canInstall = true
+    console.log('[PWA] Install prompt available')
     setCanInstall(true)
   })
 
   window.addEventListener('appinstalled', () => {
     try {
-      localStorage.setItem('appInstalled', 'true')
+      localStorage.setItem('pwaInstalled', 'true')
     } catch {
       // ignore
     }
     deferredPrompt = null
-    canInstall = false
+    console.log('[PWA] Installed!')
   })
 }
 
 export async function triggerInstall() {
-  if (!deferredPrompt) return
+  if (!deferredPrompt) {
+    console.log('[PWA] No prompt available')
+    return
+  }
 
   const choice = await deferredPrompt.userChoice
+  console.log('[PWA] User choice:', choice.outcome)
   deferredPrompt = null
-  canInstall = false
   return choice
 }
 
 export function isAppInstalled() {
+  // Check display mode
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true
+  if (window.navigator?.standalone === true) return true
+  
+  // Check localStorage
   try {
-    if (localStorage.getItem('appInstalled') === 'true') return true
+    if (localStorage.getItem('pwaInstalled') === 'true') return true
   } catch {
     // ignore
   }
-  return (
-    window.matchMedia?.('(display-mode: standalone)').matches ||
-    window.navigator?.standalone === true
-  )
+  return false
 }
 
 export function getInstallDismissed() {
   try {
-    return localStorage.getItem('installDismissed') === 'true'
+    return sessionStorage.getItem('installDismissed') === 'true'
   } catch {
     return false
   }
@@ -53,14 +60,8 @@ export function getInstallDismissed() {
 
 export function setInstallDismissed() {
   try {
-    localStorage.setItem('installDismissed', 'true')
+    sessionStorage.setItem('installDismissed', 'true')
   } catch {
     // ignore
   }
-}
-
-export function enableInstallBanner() {
-  if (!deferredPrompt || canInstall) return false
-  canInstall = true
-  return true
 }

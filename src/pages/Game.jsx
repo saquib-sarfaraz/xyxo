@@ -22,8 +22,8 @@ import {
 } from '../utils/sound'
 
 const FALLBACK_BOARD = Array.from({ length: 9 }, () => null)
-const TURN_SECONDS = 6
-const ROUND_RESTART_SECONDS = 3
+const TURN_SECONDS = 10
+const ROUND_RESTART_SECONDS = 2
 
 function pickAiMove(board) {
   const open = board
@@ -107,16 +107,17 @@ export default function Game() {
     return 'local'
   }, [roomId, routeMode])
 
-	  const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
-	  const [autoMoveMessage, setAutoMoveMessage] = useState('')
-	  const [opponentNotice, setOpponentNotice] = useState('')
-	  const [roundRestartLeft, setRoundRestartLeft] = useState(0)
-	  const [showFireworks, setShowFireworks] = useState(false)
-	  const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted())
-	  const autoPendingTurnRef = useRef(null)
-	  const timerArmedRef = useRef(false)
-	  const prevMarkCountRef = useRef(null)
-	  const prevPlayersCountRef = useRef(Array.isArray(serverPlayers) ? serverPlayers.length : 0)
+const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
+  const [autoMoveMessage, setAutoMoveMessage] = useState('')
+  const [opponentNotice, setOpponentNotice] = useState('')
+  const [roundRestartLeft, setRoundRestartLeft] = useState(0)
+  const [showFireworks, setShowFireworks] = useState(false)
+  const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted())
+  const [moveLocked, setMoveLocked] = useState(false)
+  const autoPendingTurnRef = useRef(null)
+  const timerArmedRef = useRef(false)
+  const prevMarkCountRef = useRef(null)
+  const prevPlayersCountRef = useRef(Array.isArray(serverPlayers) ? serverPlayers.length : 0)
   const joinedRoomRef = useRef(null)
 
 	  const disabled = status !== 'playing' || Boolean(winner) || isDraw
@@ -128,7 +129,8 @@ export default function Game() {
 	  const boardDisabled =
 	    disabled ||
 	    inputLocked ||
-	    (mode === 'socket' && (!socketConnected || waitingForRole || notMyTurn))
+	    (mode === 'socket' && (!socketConnected || waitingForRole || notMyTurn)) ||
+	    (mode === 'socket' && moveLocked)
 
   const authLoading = mode === 'socket' && !authHydrated
   const needsOnlineLogin = mode === 'socket' && authHydrated && !token
@@ -779,8 +781,14 @@ export default function Game() {
                     board={board}
                     onMove={(index) => {
                       if (boardDisabled) return
+                      if (moveLocked) return
+                      
                       if (mode === 'socket') {
+                        setMoveLocked(true)
                         socketSendMove({ gameId: roomId, index })
+                        setTimeout(() => {
+                          setMoveLocked(false)
+                        }, 1000)
                         return
                       }
 
