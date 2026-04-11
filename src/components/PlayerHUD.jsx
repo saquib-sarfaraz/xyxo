@@ -1,3 +1,4 @@
+import { motion as Motion } from 'framer-motion'
 import Avatar from './Avatar'
 
 function TimerBar({ active, timeLeft, timeTotal }) {
@@ -40,9 +41,12 @@ function TimerBar({ active, timeLeft, timeTotal }) {
   )
 }
 
-function PlayerCard({ player, mark, active, score, timeLeft, timeTotal }) {
+function PlayerCard({ player, mark, active, score, timeLeft, timeTotal, isMyMark }) {
   return (
-    <div
+    <Motion.div
+      initial={active ? { x: mark === 'X' ? -30 : 30, opacity: 0.5 } : false}
+      animate={active ? { x: 0, opacity: 1 } : false}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
       className={[
         'flex items-center gap-3 rounded-2xl border bg-white/5 p-4 shadow-glass backdrop-blur-xl transition',
         active ? 'border-neon-cyan/40 shadow-neon-cyan' : 'border-white/10',
@@ -58,9 +62,10 @@ function PlayerCard({ player, mark, active, score, timeLeft, timeTotal }) {
         <div className="flex items-center justify-between gap-2">
           <div className="truncate text-sm font-semibold text-zinc-100">
             {player.name}
+            {isMyMark && <span className="ml-1 text-neon-cyan">(You)</span>}
           </div>
           <div className="text-xs font-bold text-zinc-300">
-            {mark} • {score}
+            {active && isMyMark ? 'Your turn!' : `${mark} • ${score}`}
             {active && typeof timeLeft === 'number' && Number.isFinite(timeLeft) ? ` • ${timeLeft}s` : ''}
           </div>
         </div>
@@ -68,11 +73,11 @@ function PlayerCard({ player, mark, active, score, timeLeft, timeTotal }) {
           <TimerBar active={active} timeLeft={timeLeft} timeTotal={timeTotal} />
         </div>
       </div>
-    </div>
+    </Motion.div>
   )
 }
 
-export default function PlayerHUD({ players, turn, scores, timeLeft, timeTotal }) {
+export default function PlayerHUD({ players, turn, scores, timeLeft, timeTotal, myMark }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <PlayerCard
@@ -82,6 +87,7 @@ export default function PlayerHUD({ players, turn, scores, timeLeft, timeTotal }
         score={scores.X}
         timeLeft={turn === 'X' ? timeLeft : undefined}
         timeTotal={timeTotal}
+        isMyMark={myMark === 'X'}
       />
       <PlayerCard
         player={players.O}
@@ -90,6 +96,7 @@ export default function PlayerHUD({ players, turn, scores, timeLeft, timeTotal }
         score={scores.O}
         timeLeft={turn === 'O' ? timeLeft : undefined}
         timeTotal={timeTotal}
+        isMyMark={myMark === 'O'}
       />
     </div>
   )

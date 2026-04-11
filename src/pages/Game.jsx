@@ -22,18 +22,83 @@ import {
 } from '../utils/sound'
 
 const FALLBACK_BOARD = Array.from({ length: 9 }, () => null)
-const TURN_SECONDS = 10
-const ROUND_RESTART_SECONDS = 2
+const ROUND_RESTART_SECONDS = 3
 
-function pickAiMove(board) {
-  const open = board
-    .map((v, i) => (v ? null : i))
-    .filter((v) => v !== null)
-  if (!open.length) return null
-  if (board[4] === null) return 4
-  const corners = [0, 2, 6, 8].filter((i) => board[i] === null)
-  if (corners.length) return corners[Math.floor(Math.random() * corners.length)]
-  return open[Math.floor(Math.random() * open.length)]
+function checkWinner(board) {
+  const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]
+  for (const [a,b,c] of wins) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a]
+  }
+  if (board.every(Boolean)) return 'draw'
+  return null
+}
+
+function minimax(board, isMaximizing, aiMark = 'O', humanMark = 'X') {
+  const result = checkWinner(board)
+  if (result === aiMark) return 1
+  if (result === humanMark) return -1
+  if (result === 'draw') return 0
+
+  if (isMaximizing) {
+    let best = -Infinity
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = aiMark
+        const score = minimax(board, false, aiMark, humanMark)
+        board[i] = null
+        best = Math.max(score, best)
+      }
+    }
+    return best
+  } else {
+    let best = Infinity
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = humanMark
+        const score = minimax(board, true, aiMark, humanMark)
+        board[i] = null
+        best = Math.min(score, best)
+      }
+    }
+    return best
+  }
+}
+
+function pickAiMove(board, difficulty = 'hard') {
+  if (difficulty === 'easy') {
+    const open = board.map((v, i) => (v ? null : i)).filter((v) => v !== null)
+    if (!open.length) return null
+    return open[Math.floor(Math.random() * open.length)]
+  }
+
+  if (difficulty === 'medium') {
+    if (Math.random() < 0.3) {
+      const open = board.map((v, i) => (v ? null : i)).filter((v) => v !== null)
+      return open[Math.floor(Math.random() * open.length)]
+    }
+  }
+
+  let bestScore = -Infinity
+  let bestMoves = []
+
+  for (let i = 0; i < 9; i++) {
+    if (!board[i]) {
+      board[i] = 'O'
+      const score = minimax(board, false, 'O', 'X')
+      board[i] = null
+
+      if (score > bestScore) {
+        bestScore = score
+        bestMoves = [i]
+      } else if (score === bestScore) {
+        bestMoves.push(i)
+      }
+    }
+  }
+
+  if (!bestMoves.length) return null
+  const delay = 200 + Math.random() * 300
+  return { move: bestMoves[Math.floor(Math.random() * bestMoves.length)], delay }
 }
 
 export default function Game() {
@@ -80,6 +145,7 @@ export default function Game() {
   const socketDisconnect = useSocketStore((s) => s.disconnect)
   const socketJoinGame = useSocketStore((s) => s.joinGame)
   const socketSendMove = useSocketStore((s) => s.sendMove)
+  const socketSendFreeze = useSocketStore((s) => s.sendFreeze)
   const socketRequestRematch = useSocketStore((s) => s.requestRematch)
 
   const board = Array.isArray(rawBoard) && rawBoard.length === 9 ? rawBoard : FALLBACK_BOARD
@@ -107,16 +173,12 @@ export default function Game() {
     return 'local'
   }, [roomId, routeMode])
 
-  const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
-  const [autoMoveMessage, setAutoMoveMessage] = useState('')
   const [opponentNotice, setOpponentNotice] = useState('')
   const [roundRestartLeft, setRoundRestartLeft] = useState(0)
   const [showFireworks, setShowFireworks] = useState(false)
   const [soundMuted, setSoundMutedState] = useState(() => isSoundMuted())
   const [moveLocked, setMoveLocked] = useState(false)
-  const autoPendingTurnRef = useRef(null)
-  const timerArmedRef = useRef(false)
-  const prevMarkCountRef = useRef(null)
+  const [showFlash, setShowFlash] = useState(false)
   const prevPlayersCountRef = useRef(Array.isArray(serverPlayers) ? serverPlayers.length : 0)
   const joinedRoomRef = useRef(null)
 
@@ -163,11 +225,12 @@ export default function Game() {
 
 	  useEffect(() => {
 	    if (mode !== 'socket') return
-      if (!authHydrated) return
-	    if (!token) return
-	    if (!roomIdFromParams) return
+if (!authHydrated) return
+ 	    if (!token) return
+ 	    if (!roomIdFromParams) return
+ 	    if (socketConnected) return
 
-    useGameStore.getState().applyServerState({
+     useGameStore.getState().applyServerState({
       board: Array.from({ length: 9 }, () => null),
       turn: 'X',
       winner: null,
@@ -179,7 +242,7 @@ export default function Game() {
     useGameStore.getState().cancelRemove()
 
 	    socketConnect(token)
-  }, [authHydrated, mode, roomIdFromParams, socketConnect, token])
+  }, [authHydrated, mode, roomIdFromParams, socketConnect, token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (mode !== 'socket') return
@@ -197,13 +260,6 @@ export default function Game() {
     if (mode !== 'socket') return
     joinedRoomRef.current = null
   }, [mode, roomId])
-
-  useEffect(
-    () => () => {
-      socketDisconnect()
-    },
-    [socketDisconnect],
-  )
 
   useLayoutEffect(() => {
     const u = useUserStore.getState().user
@@ -237,6 +293,10 @@ export default function Game() {
                     : { name: 'Opponent', avatarHue: 285, avatarId: 'ultra5' },
             },
     })
+
+    if (mode === 'ai') {
+      useGameStore.getState().configure({ myUserId, mySymbol: 'X' })
+    }
     if (mode === 'socket') {
       if (!sameSession) {
         useGameStore.getState().applyServerState({
@@ -296,48 +356,16 @@ export default function Game() {
     if (winner || isDraw) return
     if (turn !== 'O') return
 
+    const result = pickAiMove(board, 'hard')
+    if (!result) return
+
+    const delay = result.delay || 300
     const t = setTimeout(() => {
-      const move = pickAiMove(board)
-      if (move === null) return
-      pressTile(move)
-    }, 450)
+      pressTile(result.move)
+    }, delay)
 
     return () => clearTimeout(t)
   }, [board, isDraw, mode, pressTile, status, turn, winner])
-
-  useEffect(() => {
-    if (mode !== 'socket') return
-    if (status !== 'playing') return
-    if (winner || isDraw) return
-
-    timerArmedRef.current = false
-    const reset = setTimeout(() => {
-      timerArmedRef.current = true
-      setTurnLeft(TURN_SECONDS)
-    }, 0)
-
-    const interval = setInterval(() => {
-      setTurnLeft((t) => Math.max(0, t - 1))
-    }, 1000)
-
-    return () => {
-      clearTimeout(reset)
-      clearInterval(interval)
-    }
-  }, [isDraw, mode, status, turn, winner])
-
-  useEffect(() => {
-    if (mode !== 'socket') return
-    if (!socketConnected) return
-    if (status !== 'playing') return
-    if (winner || isDraw) return
-    playSound('tick')
-  }, [isDraw, mode, socketConnected, status, turnLeft, winner])
-
-  useEffect(() => {
-    const markCount = board.reduce((total, cell) => total + (cell ? 1 : 0), 0)
-    prevMarkCountRef.current = markCount
-  }, [board])
 
   useEffect(() => {
     if (!winner) return
@@ -378,87 +406,35 @@ export default function Game() {
 	    if (!winner && !isDraw) return
 	    if (mode === 'socket' && serverPlayerCount < 2) return
 
-	    const reset = setTimeout(() => setRoundRestartLeft(ROUND_RESTART_SECONDS), 0)
-	    const interval = setInterval(() => {
-	      setRoundRestartLeft((t) => Math.max(0, t - 1))
-	    }, 1000)
+    const reset = setTimeout(() => setRoundRestartLeft(ROUND_RESTART_SECONDS), 0)
+    const interval = setInterval(() => {
+      setRoundRestartLeft((t) => Math.max(0, t - 1))
+    }, 1000)
 
-	    const restart = setTimeout(() => {
-	      dismissResultModal()
-	      if (mode === 'socket') {
-	        socketRequestRematch(roomId)
-	        return
-	      }
-	      startMatch()
-	    }, ROUND_RESTART_SECONDS * 1000)
-
-	    return () => {
-	      clearTimeout(reset)
-	      clearInterval(interval)
-	      clearTimeout(restart)
-	    }
-	  }, [
-	    dismissResultModal,
-	    isDraw,
-	    mode,
-	    roomId,
-	    serverPlayerCount,
-	    socketRequestRematch,
-	    startMatch,
-	    winner,
-	  ])
-
-  useEffect(() => {
-    if (mode !== 'socket') return
-    if (status !== 'playing') return
-    if (winner || isDraw) return
-
-    if (turnLeft !== 0) return
-    if (!timerArmedRef.current) return
-    if (autoPendingTurnRef.current === turn) return
-
-    autoPendingTurnRef.current = turn
-    const t = setTimeout(() => setAutoMoveMessage('Auto-move incoming…'), 0)
-
-    if (socketConnected && mySymbol && turn === mySymbol) {
-      const empty = board
-        .map((v, i) => (v ? null : i))
-        .filter((v) => v !== null)
-
-      if (empty.length) {
-        const index = empty[Math.floor(Math.random() * empty.length)]
-        socketSendMove({ gameId: roomId, index })
+    const restart = setTimeout(() => {
+      dismissResultModal()
+      if (mode === 'socket') {
+        socketRequestRematch(roomId)
+        return
       }
-    }
+      startMatch()
+    }, ROUND_RESTART_SECONDS * 1000)
 
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(reset)
+      clearInterval(interval)
+      clearTimeout(restart)
+    }
   }, [
-    board,
+    dismissResultModal,
     isDraw,
     mode,
-    mySymbol,
     roomId,
-    socketConnected,
-    socketSendMove,
-    status,
-    turn,
-    turnLeft,
+    serverPlayerCount,
+    socketRequestRematch,
+    startMatch,
     winner,
   ])
-
-  useEffect(() => {
-    if (mode !== 'socket') return
-    if (autoPendingTurnRef.current === null) return
-    if (autoPendingTurnRef.current === turn) return
-
-    autoPendingTurnRef.current = null
-    const show = setTimeout(() => setAutoMoveMessage('Auto move played'), 0)
-    const hide = setTimeout(() => setAutoMoveMessage(''), 1500)
-    return () => {
-      clearTimeout(show)
-      clearTimeout(hide)
-    }
-  }, [mode, turn])
 
   useEffect(() => {
     if (mode !== 'socket') return
@@ -490,12 +466,14 @@ export default function Game() {
   }, [board, roomId, scores.O, scores.X, startingTurn, winner])
 
   const handleRematch = () => {
+    navigator.vibrate?.(20)
+    setShowFlash(true)
     dismissResultModal()
     if (mode === 'socket') {
       socketRequestRematch(roomId)
-      return
     }
     startMatch()
+    setTimeout(() => setShowFlash(false), 400)
   }
 
   const handleToggleSound = () => {
@@ -520,6 +498,16 @@ export default function Game() {
         <div className="fixed inset-0 z-[70] pointer-events-none">
           <Fireworks seed={fireworksSeed} />
         </div>
+      ) : null}
+
+      {showFlash ? (
+        <Motion.div
+          className="fixed inset-0 z-[80] pointer-events-none"
+          initial={{ opacity: 0.7 }}
+          animate={{ opacity: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35 }}
+        />
       ) : null}
 
 	      <Motion.div
@@ -746,33 +734,39 @@ export default function Game() {
 	              </div>
 	            ) : null}
 
-	            {mode === 'socket' && waitingForRole ? (
-	              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-200">
-	                Syncing player roles…
-	              </div>
-	            ) : null}
+            {mode === 'socket' && waitingForRole ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-200">
+                Syncing player roles…
+              </div>
+            ) : null}
 
-	            {mode === 'socket' && autoMoveMessage ? (
-	              <div className="mt-4 rounded-2xl border border-neon-cyan/20 bg-neon-cyan/10 p-4 text-sm text-zinc-100">
-	                {autoMoveMessage}
-	              </div>
-	            ) : null}
+{winner || isDraw ? (
+              <Motion.div
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 rounded-2xl border border-white/20 bg-black/80 px-5 py-3 shadow-xl backdrop-blur-xl"
+              >
+                <span className="text-sm font-medium text-zinc-200">
+                  {roundRestartLeft > 0 ? `Next in ${roundRestartLeft}s` : 'New round…'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRematch}
+                  className="rounded-xl bg-neon-cyan px-4 py-2 text-sm font-bold text-black transition-all hover:scale-105 active:scale-95"
+                >
+                  Play Now
+                </button>
+              </Motion.div>
+            ) : null}
 
-	            {winner || isDraw ? (
-	              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-200">
-	                Next round {roundRestartLeft > 0 ? `starts in ${roundRestartLeft}…` : 'starting…'}
-	              </div>
-	            ) : null}
-
-		            <div className="mt-6">
-			              <PlayerHUD
-			                players={players}
-		                turn={turn}
-		                scores={scores}
-		                timeLeft={mode === 'socket' ? turnLeft : undefined}
-		                timeTotal={mode === 'socket' ? TURN_SECONDS : undefined}
-		              />
-	            </div>
+            <div className="mt-6">
+              <PlayerHUD
+                players={players}
+                turn={turn}
+                scores={scores}
+                myMark={mySymbol}
+              />
+            </div>
 
 	            <div className="mt-6 flex justify-center">
                 <div className="relative w-full max-w-md">
@@ -783,15 +777,13 @@ export default function Game() {
                         if (!socketConnected) return
                         if (!mySymbol) return
                         if (turn !== mySymbol) return
-
                         if (moveLocked) return
-                        setMoveLocked(true)
 
-                        pressTile(index)
+                        setMoveLocked(true)
                         socketSendMove({ gameId: roomId, index })
                         setTimeout(() => {
                           setMoveLocked(false)
-                        }, 150)
+                        }, 200)
                         return
                       }
 
@@ -847,10 +839,25 @@ export default function Game() {
               <PowerUps
                 counts={powerUps?.[turn]}
                 removeArmed={mode === 'socket' ? false : removeArmed}
-                freezeQueued={mode === 'socket' ? false : Boolean(frozenPlayer)}
-                disabled={inputLocked || mode === 'socket'}
-                onFreeze={() => activateFreeze()}
-                onRemove={() => (removeArmed ? cancelRemove() : armRemove())}
+                freezeQueued={Boolean(frozenPlayer)}
+                disabled={inputLocked || (mode === 'socket' && !socketConnected)}
+                onFreeze={() => {
+                  if (mode === 'socket') {
+                    socketSendFreeze({ gameId: roomId })
+                    return
+                  }
+                  activateFreeze()
+                }}
+                onRemove={() => {
+                  if (mode === 'socket') {
+                    return
+                  }
+                  if (removeArmed) {
+                    cancelRemove()
+                    return
+                  }
+                  armRemove()
+                }}
               />
             </div>
 
@@ -860,7 +867,7 @@ export default function Game() {
               </div>
             ) : null}
 
-            {frozenPlayer && mode !== 'socket' ? (
+            {frozenPlayer ? (
               <div className="mt-5 rounded-2xl border border-neon-cyan/20 bg-neon-cyan/10 p-4 text-sm text-zinc-100">
                 Player <span className="font-bold">{frozenPlayer}</span> is frozen — their
                 next turn will be skipped.

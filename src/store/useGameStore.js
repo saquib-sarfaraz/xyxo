@@ -150,6 +150,7 @@ const INITIAL_STATE = {
   frozenPlayer: null, // X | O | null
   removeArmed: false,
   resultModalOpen: false,
+  rematchRequest: false,
 }
 
 export const useGameStore = create(
@@ -185,6 +186,7 @@ export const useGameStore = create(
           frozenPlayer: null,
           removeArmed: false,
           resultModalOpen: false,
+          rematchRequest: false,
           scores: resetScores ? { X: 0, O: 0 } : state.scores,
         }))
       },
@@ -301,6 +303,10 @@ export const useGameStore = create(
       },
 
       dismissResultModal: () => set({ resultModalOpen: false }),
+
+      setRematchRequest: (show) => set({ rematchRequest: show }),
+
+      clearRematchRequest: () => set({ rematchRequest: false }),
 
       applyServerState: (payload) => {
         if (!payload || typeof payload !== 'object') return

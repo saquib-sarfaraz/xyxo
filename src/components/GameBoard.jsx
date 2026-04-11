@@ -23,15 +23,16 @@ function triggerHaptic() {
   }
 }
 
-function Mark({ value }) {
+function Mark({ value, index }) {
   if (!value) return null
 
   const isX = value === 'X'
   return (
     <Motion.span
       variants={tileVariants}
-      initial="idle"
-      animate="placed"
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.2, delay: index * 0.03 }}
       className={[
         'text-5xl font-black tracking-tight',
         isX ? 'text-neon-cyan text-glow-cyan' : 'text-neon-purple text-glow-purple',
@@ -42,7 +43,7 @@ function Mark({ value }) {
   )
 }
 
-const Tile = memo(function Tile({ index, value, onMove, disabled, isWinningTile, removable, removeTarget }) {
+const Tile = memo(function Tile({ index, value, onMove, disabled, isWinningTile, removable }) {
   const handlePointerDown = useCallback(() => {
     if (disabled) return
     triggerHaptic()
@@ -70,7 +71,7 @@ const Tile = memo(function Tile({ index, value, onMove, disabled, isWinningTile,
       whileTap={disabled ? undefined : { scale: 0.92 }}
       transition={{ type: 'spring', stiffness: 380, damping: 26 }}
     >
-      <Mark value={value} />
+      <Mark value={value} index={index} />
       {removable ? (
         <span className="absolute right-2 top-2 rounded-lg bg-neon-purple/15 px-2 py-0.5 text-[10px] font-semibold text-neon-purple">
           remove
@@ -100,7 +101,6 @@ function GameBoard({ board, onMove, disabled, winningLine, removeMode, removeTar
               disabled={disabled}
               isWinningTile={isWinningTile}
               removable={removable}
-              removeTarget={removeTarget}
             />
           )
         })}

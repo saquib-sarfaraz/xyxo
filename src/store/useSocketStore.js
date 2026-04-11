@@ -173,7 +173,7 @@ export const useSocketStore = create((set, get) => ({
     socket.auth = authPayload
 
     const onConnect = () => {
-      if (SOCKET_DEBUG) console.log('[socket] connected', socket.id)
+      if (SOCKET_DEBUG) console.log('[socket] ✅ connected', socket.id)
       if (SOCKET_DEBUG) {
         const engine = socket.io?.engine
         const transport = engine?.transport?.name
@@ -197,7 +197,7 @@ export const useSocketStore = create((set, get) => ({
       if (activeGameId) socket.emit('game:join', { gameId: activeGameId })
     }
     const onDisconnect = (reason) => {
-      if (SOCKET_DEBUG) console.log('[socket] disconnected', reason)
+      if (SOCKET_DEBUG) console.log('[socket] ❌ disconnected', reason)
       set({ connected: false })
     }
     const onConnectError = (err) => {
@@ -382,6 +382,9 @@ export const useSocketStore = create((set, get) => ({
     socket.on('game:over', onGameOver)
     socket.on('game_over', onGameOver)
     socket.on('rematch', onRematch)
+    socket.on('rematch:request', () => {
+      useGameStore.getState().setRematchRequest(true)
+    })
     socket.on('game:error', onGameError)
     socket.on('user:search:result', onUserSearchResult)
     socket.on('friend:request:received', onFriendRequestReceived)
@@ -436,6 +439,18 @@ export const useSocketStore = create((set, get) => ({
     const socket = get().socket
     if (!socket || !gameId) return
     socket.emit('game:move', { gameId, index })
+  },
+
+  sendFreeze: ({ gameId }) => {
+    const socket = get().socket
+    if (!socket || !gameId) return
+    socket.emit('game:freeze', { gameId })
+  },
+
+  sendRemove: ({ gameId, index }) => {
+    const socket = get().socket
+    if (!socket || !gameId) return
+    socket.emit('game:remove', { gameId, index })
   },
 
   requestRematch: (gameId) => {

@@ -33,14 +33,20 @@ export function initPWAInstall(setCanInstall) {
 
 export async function triggerInstall() {
   if (!deferredPrompt) {
-    console.log('[PWA] No prompt available')
-    return
+    console.warn('[PWA] No prompt available - event may have expired or been used')
+    return { outcome: 'dismissed' }
   }
 
-  const choice = await deferredPrompt.userChoice
-  console.log('[PWA] User choice:', choice.outcome)
-  deferredPrompt = null
-  return choice
+  try {
+    deferredPrompt.prompt()
+    const choice = await deferredPrompt.userChoice
+    console.log('[PWA] User choice:', choice.outcome)
+    deferredPrompt = null
+    return choice
+  } catch (err) {
+    console.error('[PWA] Install failed:', err)
+    return { outcome: 'error' }
+  }
 }
 
 export function isAppInstalled() {

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   connectSocket,
-  disconnectSocket,
   getSocket,
   joinRoom,
   requestRematch,
   sendMove,
+  sendFreeze,
+  sendRemove,
 } from '../services/socketService'
 import { useGameStore } from '../store/useGameStore'
 
@@ -18,14 +19,16 @@ export function useSocket(roomId) {
     if (!roomId) return
     const s = connectSocket()
 
-    const handleConnect = () => setConnected(true)
+    const handleConnect = () => {
+      setConnected(true)
+      joinRoom(roomId)
+    }
     const handleDisconnect = () => setConnected(false)
 
     s.on('connect', handleConnect)
     s.on('disconnect', handleDisconnect)
 
     return () => {
-      disconnectSocket()
       s.off('connect', handleConnect)
       s.off('disconnect', handleDisconnect)
     }
@@ -36,37 +39,34 @@ export function useSocket(roomId) {
     const s = getSocket()
     if (!s) return
 
-    const onUpdateBoard = (payload) => {
+    const onGameUpdate = (payload) => {
       requestAnimationFrame(() => {
         setTimeout(() => {
           applyServerState(payload)
         }, 30)
       })
     }
-    const onGameOver = (payload) => {
-      requestAnimationFrame(() => {
+    const onRematch = (data) => {
+      if (data?.reset) {
         setTimeout(() => {
-          applyServerState({ ...payload, status: 'finished' })
-        }, 30)
-      })
+          startMatch()
+        }, 400)
+      }
     }
-    const onRematch = () => startMatch()
+    const onRematchRequest = () => {
+      useGameStore.getState().setRematchRequest(true)
+    }
 
-    s.on('update_board', onUpdateBoard)
-    s.on('game_over', onGameOver)
-    s.on('rematch', onRematch)
+    s.on('game:update', onGameUpdate)
+    s.on('game:rematch', onRematch)
+    s.on('game:rematch-request', onRematchRequest)
 
     return () => {
-      s.off('update_board', onUpdateBoard)
-      s.off('game_over', onGameOver)
-      s.off('rematch', onRematch)
+      s.off('game:update', onGameUpdate)
+      s.off('game:rematch', onRematch)
+      s.off('game:rematch-request', onRematchRequest)
     }
   }, [applyServerState, roomId, startMatch])
-
-  useEffect(() => {
-    if (!roomId) return
-    joinRoom(roomId)
-  }, [roomId, connected])
 
   const api = useMemo(
     () => ({
@@ -74,6 +74,14 @@ export function useSocket(roomId) {
       sendMove: (index) => {
         if (!roomId) return
         sendMove(index)
+      },
+      sendFreeze: () => {
+        if (!roomId) return
+        sendFreeze()
+      },
+      sendRemove: (index) => {
+        if (!roomId) return
+        sendRemove(index)
       },
       rematch: () => {
         if (!roomId) return

@@ -12,9 +12,17 @@ export function getSocket() {
   return socket
 }
 
+export function isConnected() {
+  return socket?.connected === true
+}
+
 export function connectSocket({ url, auth } = {}) {
+  if (socket && socket.connected) {
+    return socket
+  }
+
   if (socket) {
-    if (!socket.connected) socket.connect()
+    socket.connect()
     return socket
   }
 
@@ -35,9 +43,28 @@ export function connectSocket({ url, auth } = {}) {
 
   socket = io(url ?? socketUrl(), {
     autoConnect: false,
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     auth: socketAuth,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
   })
+  
+  socket.on('connect', () => {
+    console.log('[socket] connected', socket.id)
+    if (currentRoomId) {
+      socket.emit('game:join', { gameId: currentRoomId })
+    }
+  })
+  
+  socket.on('disconnect', (reason) => {
+    console.log('[socket] disconnected:', reason)
+  })
+  
+  socket.on('connect_error', (err) => {
+    console.error('[socket] connection error:', err.message)
+  })
+  
   if (socketAuth) socket.connect()
 
   return socket
@@ -52,15 +79,27 @@ export function disconnectSocket() {
 
 export function joinRoom(roomId) {
   currentRoomId = roomId
-  socket?.emit('join_room', { roomId })
+  if (socket?.connected) {
+    socket.emit('game:join', { gameId: roomId })
+  }
 }
 
 export function sendMove(index) {
-  if (!currentRoomId) return
-  socket?.emit('send_move', { gameId: currentRoomId, index })
+  if (!currentRoomId || !socket?.connected) return
+  socket.emit('game:move', { gameId: currentRoomId, index })
 }
 
 export function requestRematch() {
-  if (!currentRoomId || !socket) return
+  if (!currentRoomId || !socket?.connected) return
   socket.emit('game:rematch', { gameId: currentRoomId })
+}
+
+export function sendFreeze() {
+  if (!currentRoomId || !socket?.connected) return
+  socket.emit('game:freeze', { gameId: currentRoomId })
+}
+
+export function sendRemove(index) {
+  if (!currentRoomId || !socket?.connected) return
+  socket.emit('game:remove', { gameId: currentRoomId, targetIndex: index })
 }
