@@ -36,8 +36,20 @@ export function useSocket(roomId) {
     const s = getSocket()
     if (!s) return
 
-    const onUpdateBoard = (payload) => applyServerState(payload)
-    const onGameOver = (payload) => applyServerState({ ...payload, status: 'finished' })
+    const onUpdateBoard = (payload) => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          applyServerState(payload)
+        }, 30)
+      })
+    }
+    const onGameOver = (payload) => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          applyServerState({ ...payload, status: 'finished' })
+        }, 30)
+      })
+    }
     const onRematch = () => startMatch()
 
     s.on('update_board', onUpdateBoard)

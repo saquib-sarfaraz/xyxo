@@ -107,7 +107,7 @@ export default function Game() {
     return 'local'
   }, [roomId, routeMode])
 
-const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
+  const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
   const [autoMoveMessage, setAutoMoveMessage] = useState('')
   const [opponentNotice, setOpponentNotice] = useState('')
   const [roundRestartLeft, setRoundRestartLeft] = useState(0)
@@ -122,15 +122,15 @@ const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
 
 	  const disabled = status !== 'playing' || Boolean(winner) || isDraw
 	  const serverPlayerCount = Array.isArray(serverPlayers) ? serverPlayers.length : 0
-	  const inputLocked =
-	    mode === 'ai' && status === 'playing' && !winner && !isDraw && turn === 'O'
-	  const waitingForRole = mode === 'socket' && status === 'playing' && !mySymbol
-	  const notMyTurn = mode === 'socket' && status === 'playing' && mySymbol && turn !== mySymbol
-	  const boardDisabled =
-	    disabled ||
-	    inputLocked ||
-	    (mode === 'socket' && (!socketConnected || waitingForRole || notMyTurn)) ||
-	    (mode === 'socket' && moveLocked)
+  const inputLocked =
+    mode === 'ai' && status === 'playing' && !winner && !isDraw && turn === 'O'
+  const waitingForRole = mode === 'socket' && status === 'playing' && !mySymbol
+  const notMyTurn = mode === 'socket' && status === 'playing' && mySymbol && turn !== mySymbol
+  const boardDisabled =
+    disabled ||
+    inputLocked ||
+    (mode === 'socket' && (!socketConnected || waitingForRole || notMyTurn)) ||
+    moveLocked
 
   const authLoading = mode === 'socket' && !authHydrated
   const needsOnlineLogin = mode === 'socket' && authHydrated && !token
@@ -782,22 +782,29 @@ const [turnLeft, setTurnLeft] = useState(TURN_SECONDS)
                     onMove={(index) => {
                       if (boardDisabled) return
                       if (moveLocked) return
-                      
+                      setMoveLocked(true)
+
                       if (mode === 'socket') {
-                        setMoveLocked(true)
+                        pressTile(index)
                         socketSendMove({ gameId: roomId, index })
                         setTimeout(() => {
                           setMoveLocked(false)
-                        }, 1000)
+                        }, 150)
                         return
                       }
 
                       if (removeArmed) {
                         pressTile(index)
+                        setTimeout(() => {
+                          setMoveLocked(false)
+                        }, 150)
                         return
                       }
 
                       pressTile(index)
+                      setTimeout(() => {
+                        setMoveLocked(false)
+                      }, 150)
                     }}
                     disabled={boardDisabled}
                     winningLine={winningLine}

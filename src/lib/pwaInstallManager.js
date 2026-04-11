@@ -1,10 +1,17 @@
 let deferredPrompt = null
+let listenersInitialized = false
 
 export function initPWAInstall(setCanInstall) {
   if (isAppInstalled()) {
     console.log('[PWA] Already installed')
     return
   }
+
+  if (listenersInitialized) {
+    console.log('[PWA] Listeners already initialized')
+    return
+  }
+  listenersInitialized = true
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()

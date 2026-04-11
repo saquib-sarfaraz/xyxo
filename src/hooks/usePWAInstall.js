@@ -5,13 +5,13 @@ export function usePWAInstall() {
   const [canInstall, setCanInstall] = useState(false)
 
   useEffect(() => {
-    if (isAppInstalled()) {
-      console.log('[PWA] Already installed, skipping')
-      return
-    }
-    
     if (getInstallDismissed()) {
       console.log('[PWA] User dismissed previously, skipping')
+      return
+    }
+
+    if (isAppInstalled()) {
+      console.log('[PWA] Already installed, skipping')
       return
     }
 
