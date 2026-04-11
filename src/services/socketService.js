@@ -2,6 +2,7 @@ import { io } from 'socket.io-client'
 import { TOKEN_KEY } from '../api/axios'
 
 let socket = null
+let currentRoomId = null
 
 function socketUrl() {
   return import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001'
@@ -43,21 +44,23 @@ export function connectSocket({ url, auth } = {}) {
 }
 
 export function disconnectSocket() {
+  currentRoomId = null
   if (!socket) return
   socket.disconnect()
   socket = null
 }
 
 export function joinRoom(roomId) {
-  socket?.emit('join_room', roomId)
+  currentRoomId = roomId
+  socket?.emit('join_room', { roomId })
 }
 
 export function sendMove(index) {
-  socket?.emit('send_move', index)
+  if (!currentRoomId) return
+  socket?.emit('send_move', { gameId: currentRoomId, index })
 }
 
 export function requestRematch() {
-  if (!socket) return
-  socket.emit('game:rematch')
-  socket.emit('rematch')
+  if (!currentRoomId || !socket) return
+  socket.emit('game:rematch', { gameId: currentRoomId })
 }
