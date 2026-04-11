@@ -125,11 +125,10 @@ export default function Game() {
   const inputLocked =
     mode === 'ai' && status === 'playing' && !winner && !isDraw && turn === 'O'
   const waitingForRole = mode === 'socket' && status === 'playing' && !mySymbol
-  const notMyTurn = mode === 'socket' && status === 'playing' && mySymbol && turn !== mySymbol
   const boardDisabled =
     disabled ||
     inputLocked ||
-    (mode === 'socket' && (!socketConnected || waitingForRole || notMyTurn)) ||
+    (mode === 'socket' && !socketConnected) ||
     moveLocked
 
   const authLoading = mode === 'socket' && !authHydrated
@@ -780,11 +779,14 @@ export default function Game() {
                   <GameBoard
                     board={board}
                     onMove={(index) => {
-                      if (boardDisabled) return
-                      if (moveLocked) return
-                      setMoveLocked(true)
-
                       if (mode === 'socket') {
+                        if (!socketConnected) return
+                        if (!mySymbol) return
+                        if (turn !== mySymbol) return
+
+                        if (moveLocked) return
+                        setMoveLocked(true)
+
                         pressTile(index)
                         socketSendMove({ gameId: roomId, index })
                         setTimeout(() => {
@@ -793,18 +795,14 @@ export default function Game() {
                         return
                       }
 
+                      if (boardDisabled) return
+
                       if (removeArmed) {
                         pressTile(index)
-                        setTimeout(() => {
-                          setMoveLocked(false)
-                        }, 150)
                         return
                       }
 
                       pressTile(index)
-                      setTimeout(() => {
-                        setMoveLocked(false)
-                      }, 150)
                     }}
                     disabled={boardDisabled}
                     winningLine={winningLine}
