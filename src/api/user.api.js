@@ -15,27 +15,26 @@ export async function searchUsers(query) {
 }
 
 export async function fetchUserStats(userId) {
-  const res = await API.get(`/api/users/${userId}/stats`)
+  const res = await API.get(`/users/${userId}/stats`)
   return res.data
 }
 
 export async function fetchFriends() {
-  const res = await API.get('/api/friends')
+  const res = await API.get('/friends')
   return res.data
 }
 
 export async function sendFriendRequest(receiverId) {
-  const res = await API.post('/api/friends/requests', { receiverId })
+  const res = await API.post('/friends/requests', { receiverId })
   return res.data
 }
 
 export async function acceptFriendRequest(requestId) {
-  const res = await API.post(`/api/friends/requests/${requestId}/accept`)
+  const res = await API.post(`/friends/requests/${requestId}/accept`)
   return res.data
 }
 
 export async function fetchPendingRequests() {
-  const res = await API.get('/api/friends/requests/pending')
+  const res = await API.get('/friends/requests/pending')
   return res.data
 }
-

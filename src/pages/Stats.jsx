@@ -5,14 +5,33 @@ import { fetchUserStats } from '../api/user.api'
 import { useAppStore } from '../store/useAppStore'
 import { useUserStore } from '../store/useUserStore'
 
+function toFiniteNumber(value) {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function safeInt(value, fallback = 0) {
+  const n = toFiniteNumber(value)
+  if (n == null) return fallback
+  return Math.trunc(n)
+}
+
+function clampInt(value, min, max, fallback = 0) {
+  const n = safeInt(value, fallback)
+  return Math.min(max, Math.max(min, n))
+}
+
 function Metric({ label, value, highlight }) {
+  const safeValue =
+    typeof value === 'number' && !Number.isFinite(value) ? 0 : value
+
   return (
     <div className="glass-panel p-5">
       <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
         {label}
       </div>
       <div className={`mt-2 font-display text-2xl font-bold ${highlight || 'text-zinc-100'}`}>
-        {value}
+        {safeValue}
       </div>
     </div>
   )
@@ -20,18 +39,22 @@ function Metric({ label, value, highlight }) {
 
 export default function Stats() {
   const user = useUserStore((s) => s.user)
-  const localStats = user?.stats ?? { matches: 0, wins: 0, losses: 0, xp: 0 }
+  const localStats = user?.stats ?? { matches: 0, wins: 0, losses: 0, draws: 0, xp: 0 }
   const matches = useAppStore((s) => s.matches)
   const clearMatches = useAppStore((s) => s.clearMatches)
   const [serverStats, setServerStats] = useState(null)
   const mountedRef = useRef(true)
 
-  const stats = serverStats?.stats || localStats
+  const userIdRaw = user?._id || user?.id || null
+  const userId = userIdRaw != null ? String(userIdRaw) : null
+  const shouldFetchServerStats =
+    user?.authProvider === 'backend' && typeof userId === 'string' && /^[a-f\d]{24}$/i.test(userId)
+  const stats = serverStats?.stats && typeof serverStats.stats === 'object' ? serverStats.stats : localStats
 
   useEffect(() => {
-    if (!user?._id) return
+    if (!shouldFetchServerStats) return
     mountedRef.current = true
-    fetchUserStats(user._id)
+    fetchUserStats(userId)
       .then((data) => {
         if (mountedRef.current) setServerStats(data)
       })
@@ -41,13 +64,27 @@ export default function Stats() {
     return () => {
       mountedRef.current = false
     }
-  }, [user?._id])
+  }, [shouldFetchServerStats, userId])
 
-  const totalGames = (stats.matches || stats.wins + stats.losses + stats.draws) ?? 0
+  const wins = safeInt(stats.wins, 0)
+  const losses = safeInt(stats.losses, 0)
+  const draws = safeInt(stats.draws, 0)
+  const xp = safeInt(stats.score ?? stats.xp, 0)
+
+  const totalGames = useMemo(() => {
+    const fromTotal = toFiniteNumber(stats.totalGames)
+    if (fromTotal != null) return Math.max(0, Math.trunc(fromTotal))
+    const fromMatches = toFiniteNumber(stats.matches)
+    if (fromMatches != null) return Math.max(0, Math.trunc(fromMatches))
+    return wins + losses + draws
+  }, [draws, losses, stats.matches, stats.totalGames, wins])
+
   const winRate = useMemo(() => {
-    if (!totalGames) return 0
-    return Math.round((stats.wins / totalGames) * 100)
-  }, [totalGames, stats.wins])
+    const fromServer = toFiniteNumber(stats.winRate)
+    if (fromServer != null) return clampInt(Math.round(fromServer), 0, 100, 0)
+    if (totalGames <= 0) return 0
+    return clampInt(Math.round((wins / totalGames) * 100), 0, 100, 0)
+  }, [stats.winRate, totalGames, wins])
 
   const history = useMemo(() => {
     const username = user?.username
@@ -60,7 +97,8 @@ export default function Stats() {
   }, [matches, user?.username])
 
   const streak = useMemo(() => {
-    if (serverStats?.stats?.currentStreak) return serverStats.stats.currentStreak
+    const serverStreak = toFiniteNumber(serverStats?.stats?.currentStreak)
+    if (serverStreak != null) return Math.max(0, Math.trunc(serverStreak))
     let s = 0
     for (const m of history) {
       if (m.outcome !== 'win') break
@@ -69,14 +107,15 @@ export default function Stats() {
     return s
   }, [history, serverStats])
 
-  const bestStreak = serverStats?.stats?.bestStreak || 0
-  const draws = stats.draws || 0
+  const bestStreak = Math.max(0, safeInt(serverStats?.stats?.bestStreak, 0))
 
   const chart = useMemo(() => {
-    const recent = serverStats?.recentMatches?.slice(0, 10).reverse() || history.slice(0, 10).reverse()
+    const recent = Array.isArray(serverStats?.recentMatches)
+      ? serverStats.recentMatches.slice(0, 10).reverse()
+      : history.slice(0, 10).reverse()
     const samples = recent.map((m, i) => ({
       label: `#${i + 1}`,
-      v: m.result === 'win' ? 10 : m.result === 'loss' ? 5 : 7,
+      v: (m.result ?? m.outcome) === 'win' ? 10 : (m.result ?? m.outcome) === 'loss' ? 5 : 7,
     }))
     while (samples.length < 10) {
       samples.unshift({ label: '-', v: 2 })
@@ -111,8 +150,8 @@ export default function Stats() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <Metric label="Matches" value={totalGames} />
-          <Metric label="Wins" value={stats.wins} highlight="text-neon-cyan" />
-          <Metric label="Losses" value={stats.losses} highlight="text-neon-purple" />
+          <Metric label="Wins" value={wins} highlight="text-neon-cyan" />
+          <Metric label="Losses" value={losses} highlight="text-neon-purple" />
           <Metric label="Draws" value={draws} highlight="text-yellow-400" />
           <Metric label="Win rate" value={`${winRate}%`} />
           <Metric label="Streak" value={streak} highlight={streak > 0 ? 'text-orange-400' : 'text-zinc-100'} />
@@ -135,13 +174,13 @@ export default function Stats() {
               </div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-200">
-              XP: <span className="font-semibold">{stats.xp}</span>
+              XP: <span className="font-semibold">{xp}</span>
             </div>
           </div>
 
           <div className="mt-5 flex items-end gap-2">
-            {chart.samples.map((s) => (
-              <div key={s.label} className="flex flex-1 flex-col items-center gap-2">
+            {chart.samples.map((s, i) => (
+              <div key={`${s.label}-${i}`} className="flex flex-1 flex-col items-center gap-2">
                 <div
                   className="w-full rounded-xl border border-white/10 bg-white/5 shadow-glass"
                   style={{ height: `${Math.round((s.v / chart.max) * 160) + 18}px` }}

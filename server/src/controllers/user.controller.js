@@ -21,13 +21,6 @@ export async function getUserStats(req, res) {
   const draws = stats.draws || 0
   const total = wins + losses + draws
 
-  const rankPipeline = [
-    { $match: {} },
-    { $addFields: { totalXp: { $ifNull: ['$stats.xp', 0] } } },
-    { $sort: { totalXp: -1 } },
-    { $group: { _id: null, ids: { $push: '$_id' } } },
-  ]
-
   let rank = 1
   try {
     const [result] = await User.aggregate([
@@ -80,4 +73,51 @@ export async function getUserStats(req, res) {
       createdAt: m.createdAt,
     })),
   })
+}
+
+export async function getCurrentUser(req, res) {
+  try {
+    const userId = req.user?.sub || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await User.findById(userId).select('name username avatar region stats').lean();
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const stats = user.stats || {};
+    const wins = stats.wins || 0;
+    const losses = stats.losses || 0;
+    const draws = stats.draws || 0;
+    const totalGames = wins + losses + draws;
+    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
+    
+    res.json({
+      id: String(user._id),
+      username: user.username,
+      displayName: user.name || user.username,
+      isGuest: false,
+      authProvider: 'backend',
+      avatarId: user.avatar || '',
+      avatarHue: 0,
+      region: user.region || 'global',
+      stats: {
+        wins,
+        losses,
+        draws,
+        xp: stats.xp || 0,
+        currentStreak: stats.currentStreak || 0,
+        bestStreak: stats.bestStreak || 0,
+        lastResult: stats.lastResult || null,
+        totalGames,
+        winRate,
+      },
+    });
+  } catch (error) {
+    console.error('[USER] getCurrentUser error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 }

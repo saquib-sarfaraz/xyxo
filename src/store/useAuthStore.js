@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { login, signup } from '../api/auth.api'
+import { login, signup, logout as logoutApi } from '../api/auth.api'
 import { fetchMe } from '../api/user.api'
-import { TOKEN_KEY } from '../api/axios'
+import { AUTH_TOKEN_UPDATED_EVENT, REFRESH_TOKEN_KEY, TOKEN_KEY } from '../api/axios'
 
 function readToken() {
   try {
@@ -21,6 +21,16 @@ function writeToken(token) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('token')
     }
+  } catch {
+    // ignore
+  }
+}
+
+function clearAllTokens() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem('token')
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
   } catch {
     // ignore
   }
@@ -60,7 +70,7 @@ export const useAuthStore = create(
       token: readToken(),
       user: null,
       hydrated: false,
-      status: 'idle', // idle | loading | ready | error
+      status: 'idle',
       error: null,
 
       setHydrated: (hydrated) => set({ hydrated: Boolean(hydrated) }),
@@ -133,9 +143,21 @@ export const useAuthStore = create(
         }
       },
 
-      logout: () => {
-        writeToken(null)
-        set({ token: null, user: null, status: 'idle', error: null })
+      logout: async () => {
+        try {
+          await logoutApi();
+        } catch (err) {
+          console.error('[AUTH] Logout API error:', err);
+        } finally {
+          writeToken(null)
+          // Note: refresh token is cleared via httpOnly cookie on server
+          set({ token: null, user: null, status: 'idle', error: null })
+        }
+      },
+
+      clearAuth: () => {
+        clearAllTokens();
+        set({ token: null, user: null, status: 'idle', error: null });
       },
     }),
     {
@@ -145,9 +167,28 @@ export const useAuthStore = create(
         token: state.token,
         user: state.user,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState && typeof persistedState === 'object' ? persistedState : {}
+        return { ...currentState, ...persisted, token: currentState.token }
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true)
       },
     },
   ),
 )
+
+if (typeof window !== 'undefined') {
+  const KEY = '__ttproAuthTokenListener'
+  if (!window[KEY]) {
+    window[KEY] = true
+    window.addEventListener(AUTH_TOKEN_UPDATED_EVENT, (e) => {
+      const token = e?.detail?.token
+      if (typeof token === 'string' && token.trim()) {
+        useAuthStore.getState().setToken(token)
+        return
+      }
+      useAuthStore.getState().clearAuth()
+    })
+  }
+}

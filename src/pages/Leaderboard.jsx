@@ -1,6 +1,6 @@
 import { motion as Motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
-import { fetchLeaderboard } from '../api/leaderboard.api'
+import { fetchLeaderboard, fetchLifetimeLeaderboard } from '../api/leaderboard.api'
 import LeaderboardTable from '../components/LeaderboardTable'
 import { useAuthStore } from '../store/useAuthStore'
 import { useSocketStore } from '../store/useSocketStore'
@@ -20,20 +20,40 @@ function OnlineCount() {
   )
 }
 
+function toFiniteNumber(value) {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function safeInt(value, fallback = 0) {
+  const n = toFiniteNumber(value)
+  if (n == null) return fallback
+  return Math.trunc(n)
+}
+
+function clampInt(value, min, max, fallback = 0) {
+  const n = safeInt(value, fallback)
+  return Math.min(max, Math.max(min, n))
+}
+
 function mapLeaderboardPayload(raw) {
   const list = Array.isArray(raw?.leaderboard) ? raw.leaderboard : []
   return list.map((u, i) => {
-    const wins = Number(u?.stats?.wins ?? u?.wins ?? 0)
-    const losses = Number(u?.stats?.losses ?? u?.losses ?? 0)
+    const wins = Math.max(0, safeInt(u?.stats?.wins ?? u?.wins, 0))
+    const losses = Math.max(0, safeInt(u?.stats?.losses ?? u?.losses, 0))
     const total = wins + losses
     const computedWinRate = total > 0 ? Math.round((wins / total) * 100) : 0
     const id = u?._id != null ? String(u._id) : u?.username != null ? String(u.username) : `row-${i}`
+    const rankRaw = toFiniteNumber(u?.rank)
+    const rank = rankRaw != null && rankRaw > 0 ? Math.trunc(rankRaw) : i + 1
+    const winRate = clampInt(Math.round(toFiniteNumber(u?.winRate) ?? computedWinRate), 0, 100, 0)
+    const xp = Math.max(0, safeInt(u?.xp ?? u?.stats?.xp ?? u?.score ?? u?.stats?.score, 0))
     return {
       id,
-      rank: Number(u?.rank ?? i + 1),
+      rank,
       player: String(u?.name || u?.displayName || u?.username || 'Player'),
-      winRate: Number(u?.winRate ?? computedWinRate),
-      xp: Number(u?.xp ?? u?.stats?.xp ?? 0),
+      winRate,
+      xp,
     }
   })
 }
@@ -58,12 +78,14 @@ export default function Leaderboard() {
   const authHydrated = useAuthStore((s) => s.hydrated)
   const token = useAuthStore((s) => s.token)
   const socketConnect = useSocketStore((s) => s.connect)
-  const [tab, setTab] = useState('global')
-  const [rowsByScope, setRowsByScope] = useState({ global: [], regional: [] })
+  const [scope, setScope] = useState('global')
+  const [timeframe, setTimeframe] = useState('rolling') // rolling | lifetime
+  const [rowsByKey, setRowsByKey] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const rows = useMemo(() => rowsByScope?.[tab] || [], [rowsByScope, tab])
+  const key = `${timeframe}:${scope}`
+  const rows = useMemo(() => rowsByKey?.[key] || [], [key, rowsByKey])
   const currentName = user?.displayName || user?.username
 
   useEffect(() => {
@@ -78,12 +100,15 @@ export default function Leaderboard() {
       setLoading(true)
       setError('')
       try {
-        const raw = await fetchLeaderboard(tab)
+        const raw =
+          timeframe === 'lifetime'
+            ? await fetchLifetimeLeaderboard(scope)
+            : await fetchLeaderboard(scope)
         if (cancelled) return
         const mapped = mapLeaderboardPayload(raw)
-        setRowsByScope((prev) => ({
+        setRowsByKey((prev) => ({
           ...prev,
-          [tab]: mergeRows(prev?.[tab], mapped),
+          [key]: mergeRows(prev?.[key], mapped),
         }))
         setError('')
       } catch (err) {
@@ -106,16 +131,19 @@ export default function Leaderboard() {
     return () => {
       cancelled = true
     }
-  }, [tab])
+  }, [key, scope, timeframe])
 
   useEffect(() => {
     const onSocketRefresh = async () => {
       try {
-        const raw = await fetchLeaderboard(tab)
+        const raw =
+          timeframe === 'lifetime'
+            ? await fetchLifetimeLeaderboard(scope)
+            : await fetchLeaderboard(scope)
         const mapped = mapLeaderboardPayload(raw)
-        setRowsByScope((prev) => ({
+        setRowsByKey((prev) => ({
           ...prev,
-          [tab]: mergeRows(prev?.[tab], mapped),
+          [key]: mergeRows(prev?.[key], mapped),
         }))
       } catch {
         // keep existing rows on background refresh failure
@@ -123,7 +151,7 @@ export default function Leaderboard() {
     }
     window.addEventListener('xyxo:leaderboard:update', onSocketRefresh)
     return () => window.removeEventListener('xyxo:leaderboard:update', onSocketRefresh)
-  }, [tab])
+  }, [key, scope, timeframe])
 
   const displayRows = rows
 
@@ -140,7 +168,9 @@ export default function Leaderboard() {
           <div>
             <div className="font-display text-xl font-bold text-zinc-100">Leaderboard</div>
             <div className="mt-1 text-sm text-zinc-300">
-              Rolling 7-day rankings powered by live stats.
+              {timeframe === 'lifetime'
+                ? 'All-time rankings based on lifetime XP.'
+                : 'Rolling 7-day rankings powered by live stats.'}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -148,19 +178,45 @@ export default function Leaderboard() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className={['glass-button px-4 py-2 text-xs', tab === 'global' ? 'nav-active' : '']
+                className={[
+                  'glass-button px-4 py-2 text-xs',
+                  timeframe === 'rolling' ? 'nav-active' : '',
+                ]
                   .join(' ')
                   .trim()}
-                onClick={() => setTab('global')}
+                onClick={() => setTimeframe('rolling')}
+              >
+                7-day
+              </button>
+              <button
+                type="button"
+                className={[
+                  'glass-button px-4 py-2 text-xs',
+                  timeframe === 'lifetime' ? 'nav-active' : '',
+                ]
+                  .join(' ')
+                  .trim()}
+                onClick={() => setTimeframe('lifetime')}
+              >
+                All-time
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={['glass-button px-4 py-2 text-xs', scope === 'global' ? 'nav-active' : '']
+                  .join(' ')
+                  .trim()}
+                onClick={() => setScope('global')}
               >
                 Global
               </button>
               <button
                 type="button"
-                className={['glass-button px-4 py-2 text-xs', tab === 'regional' ? 'nav-active' : '']
+                className={['glass-button px-4 py-2 text-xs', scope === 'regional' ? 'nav-active' : '']
                   .join(' ')
                   .trim()}
-                onClick={() => setTab('regional')}
+                onClick={() => setScope('regional')}
               >
                 Regional
               </button>
@@ -170,8 +226,25 @@ export default function Leaderboard() {
 
         <div className="mt-6 space-y-3">
           {loading && !displayRows.length ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
-              Loading leaderboard...
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
+                Loading leaderboard...
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="space-y-3 animate-pulse">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-white/10" />
+                      <div className="flex-1">
+                        <div className="h-3 w-40 rounded bg-white/10" />
+                        <div className="mt-2 h-3 w-24 rounded bg-white/10" />
+                      </div>
+                      <div className="h-3 w-16 rounded bg-white/10" />
+                      <div className="h-3 w-16 rounded bg-white/10" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-neon-purple/30 bg-neon-purple/10 p-4 text-sm text-zinc-100">

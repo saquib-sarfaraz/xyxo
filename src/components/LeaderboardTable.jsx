@@ -15,7 +15,25 @@ function RankBadge({ rank }) {
   )
 }
 
+function toFiniteNumber(value) {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function safeInt(value, fallback = 0) {
+  const n = toFiniteNumber(value)
+  if (n == null) return fallback
+  return Math.trunc(n)
+}
+
+function clampInt(value, min, max, fallback = 0) {
+  const n = safeInt(value, fallback)
+  return Math.min(max, Math.max(min, n))
+}
+
 export default function LeaderboardTable({ rows, currentUsername }) {
+  const safeRows = Array.isArray(rows) ? rows : []
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-glass backdrop-blur-xl">
       <table className="w-full text-left text-sm">
@@ -28,9 +46,13 @@ export default function LeaderboardTable({ rows, currentUsername }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-white/10">
-          {rows.map((row) => {
-            const isMe = currentUsername && row.player === currentUsername
-            const rowKey = row.id || row.player
+          {safeRows.map((row, i) => {
+            const player = String(row?.player || 'Player')
+            const isMe = currentUsername && player === currentUsername
+            const rowKey = row?.id || player || `row-${i}`
+            const rank = clampInt(row?.rank ?? i + 1, 1, 9999, i + 1)
+            const winRate = clampInt(Math.round(toFiniteNumber(row?.winRate) ?? 0), 0, 100, 0)
+            const xp = Math.max(0, safeInt(row?.xp, 0))
             return (
               <tr
                 key={rowKey}
@@ -40,11 +62,11 @@ export default function LeaderboardTable({ rows, currentUsername }) {
                 ].join(' ')}
               >
                 <td className="px-4 py-3">
-                  <RankBadge rank={row.rank} />
+                  <RankBadge rank={rank} />
                 </td>
-                <td className="px-4 py-3 text-zinc-100">{row.player}</td>
-                <td className="px-4 py-3 text-zinc-200">{row.winRate}%</td>
-                <td className="px-4 py-3 font-semibold text-neon-cyan">{row.xp}</td>
+                <td className="px-4 py-3 text-zinc-100">{player}</td>
+                <td className="px-4 py-3 text-zinc-200">{winRate}%</td>
+                <td className="px-4 py-3 font-semibold text-neon-cyan">{xp}</td>
               </tr>
             )
           })}
@@ -53,4 +75,3 @@ export default function LeaderboardTable({ rows, currentUsername }) {
     </div>
   )
 }
-

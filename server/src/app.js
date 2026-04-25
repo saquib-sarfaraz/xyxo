@@ -1,27 +1,12 @@
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import leaderboardRoutes from './routes/leaderboard.routes.js'
 import userRoutes from './routes/user.routes.js'
 import friendRoutes from './routes/friend.routes.js'
 import { createStatsRouter } from './routes/stats.routes.js'
-
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization
-  const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-  try {
-    const payload = JSON.parse(Buffer.from(token, 'base64').toString())
-    if (payload?.id || payload?._id) {
-      req.user = { id: payload.id || payload._id }
-      return next()
-    }
-    return res.status(401).json({ error: 'Invalid token payload' })
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' })
-  }
-}
+import authRoutes from './routes/auth.routes.js'
+import { verifyToken } from './middleware/auth.middleware.js'
 
 function getCorsOrigins() {
   const clientUrl = process.env.CLIENT_URL?.trim()
@@ -50,6 +35,7 @@ export function createApp({ io } = {}) {
     }),
   )
   app.use(express.json())
+  app.use(cookieParser())
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'xyxo-api', env: isProduction ? 'production' : 'development' })
@@ -59,6 +45,9 @@ export function createApp({ io } = {}) {
     res.json({ status: 'ok', timestamp: Date.now() })
   })
 
+  // Auth routes
+  app.use('/api/auth', authRoutes)
+
   /** Leaderboard API:
    * - GET /api/leaderboard (lifetime)
    * - GET /api/leaderboard/rolling (7-day rolling)
@@ -66,6 +55,7 @@ export function createApp({ io } = {}) {
   app.use('/api/leaderboard', leaderboardRoutes)
   /** User stats API:
    * - GET /api/users/:id/stats
+   * - GET /api/users/me (current user profile)
    */
   app.use('/api/users', userRoutes)
   app.use('/api/stats', createStatsRouter({ io, requireStatsKey }))
@@ -75,7 +65,7 @@ export function createApp({ io } = {}) {
    * - GET /api/friends (list friends)
    * - GET /api/friends/requests/pending (pending requests)
    */
-  app.use('/api/friends', authMiddleware, friendRoutes)
+  app.use('/api/friends', verifyToken, friendRoutes)
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' })

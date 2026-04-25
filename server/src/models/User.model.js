@@ -28,9 +28,11 @@ const userSchema = new mongoose.Schema(
     name: { type: String, trim: true, default: '' },
     username: { type: String, trim: true, sparse: true, index: true },
     avatar: { type: String, trim: true, default: '' },
+    password: { type: String, trim: true },
     region: { type: String, trim: true, default: 'global', index: true },
     stats: { type: statsSchema, default: () => ({}) },
     friends: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] },
+    refreshToken: { type: String, default: null },
   },
   { timestamps: true },
 )
